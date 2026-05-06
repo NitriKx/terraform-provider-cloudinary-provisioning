@@ -1,0 +1,60 @@
+version: "3"
+
+vars:
+  BINARY: terraform-provider-cloudinary-provisioning
+  OS:
+    sh: go env GOOS
+  ARCH:
+    sh: go env GOARCH
+  TF_REGISTRY_DIR: ~/.terraform.d/plugins/registry.terraform.io/NitriKx/cloudinary-provisioning/0.1.0/{{.OS}}_{{.ARCH}}
+
+tasks:
+  default:
+    cmds:
+      - task: build
+
+  build:
+    desc: Build the provider binary
+    cmds:
+      - go build -o {{.BINARY}} .
+    sources:
+      - "**/*.go"
+    generates:
+      - "{{.BINARY}}"
+
+  install:
+    desc: Build and install the provider locally for manual testing
+    deps: [build]
+    cmds:
+      - mkdir -p {{.TF_REGISTRY_DIR}}
+      - cp {{.BINARY}} {{.TF_REGISTRY_DIR}}/
+
+  test:
+    desc: Run unit tests
+    cmds:
+      - go test ./... -v -count=1
+
+  testacc:
+    desc: Run acceptance tests (requires real Cloudinary credentials via environment variables)
+    cmds:
+      - TF_ACC=1 go test ./... -v -timeout 120m -count=1
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run ./...
+
+  docs:
+    desc: Generate provider documentation with tfplugindocs
+    cmds:
+      - go generate ./...
+
+  tidy:
+    desc: Tidy Go modules
+    cmds:
+      - go mod tidy
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -f {{.BINARY}}
