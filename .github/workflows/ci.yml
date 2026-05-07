@@ -29,22 +29,6 @@ jobs:
 
       - uses: pre-commit/action@v3.0.1
 
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
-        with:
-          version: latest
-
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
