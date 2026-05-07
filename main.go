@@ -12,7 +12,7 @@ import (
 // version is set at build time via goreleaser ldflags.
 var version string = "dev"
 
-//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-dir .
+//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-dir . --provider-name cloudinaryprovisioning
 
 func main() {
 	var debug bool
