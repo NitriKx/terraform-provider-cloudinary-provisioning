@@ -92,6 +92,7 @@ resource "cloudinaryprovisioning_product_environment" "example" {
 - `cloud_name` (Optional, Computed) - Cloudinary cloud name. Auto-generated if not provided.
 - `enabled` (Optional, Computed) - Whether the environment is enabled. Defaults to `true`.
 - `base_sub_account_id` (Optional) - ID of an existing environment to copy settings from. Forces replacement.
+- `deletion_protection` (Optional, Computed) - Whether to block `terraform destroy` on this resource. Defaults to `true`. To destroy, set to `false` and run `terraform apply` first.
 
 **Attributes:**
 - `id` - The unique identifier assigned by Cloudinary.

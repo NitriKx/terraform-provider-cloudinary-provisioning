@@ -22,6 +22,7 @@ import (
 
 var _ resource.Resource = &productEnvironmentResource{}
 var _ resource.ResourceWithImportState = &productEnvironmentResource{}
+var _ resource.ResourceWithModifyPlan = &productEnvironmentResource{}
 
 // NewResource returns a new cloudinaryprovisioning_product_environment resource.
 func NewResource() resource.Resource {
@@ -33,13 +34,14 @@ type productEnvironmentResource struct {
 }
 
 type productEnvironmentModel struct {
-	ID               types.String `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	CloudName        types.String `tfsdk:"cloud_name"`
-	Enabled          types.Bool   `tfsdk:"enabled"`
-	BaseSubAccountID types.String `tfsdk:"base_sub_account_id"`
-	CreatedAt        types.String `tfsdk:"created_at"`
-	UpdatedAt        types.String `tfsdk:"updated_at"`
+	ID                 types.String `tfsdk:"id"`
+	Name               types.String `tfsdk:"name"`
+	CloudName          types.String `tfsdk:"cloud_name"`
+	Enabled            types.Bool   `tfsdk:"enabled"`
+	BaseSubAccountID   types.String `tfsdk:"base_sub_account_id"`
+	CreatedAt          types.String `tfsdk:"created_at"`
+	UpdatedAt          types.String `tfsdk:"updated_at"`
+	DeletionProtection types.Bool   `tfsdk:"deletion_protection"`
 }
 
 func (r *productEnvironmentResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -95,6 +97,14 @@ func (r *productEnvironmentResource) Schema(_ context.Context, _ resource.Schema
 				Computed:    true,
 				Description: "The time at which the product environment was last updated (RFC3339).",
 			},
+			"deletion_protection": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(true),
+				Description: "Whether to prevent accidental deletion of this product environment. " +
+					"Defaults to true. When true, terraform destroy will fail with an error. " +
+					"To destroy the resource, set this to false and run terraform apply first.",
+			},
 		},
 	}
 }
@@ -137,7 +147,7 @@ func (r *productEnvironmentResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	state := productEnvironmentFromResult(result, plan.BaseSubAccountID)
+	state := productEnvironmentFromResult(result, plan.BaseSubAccountID, plan.DeletionProtection)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -170,7 +180,11 @@ func (r *productEnvironmentResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	newState := productEnvironmentFromResult(result, state.BaseSubAccountID)
+	deletionProtection := state.DeletionProtection
+	if deletionProtection.IsNull() {
+		deletionProtection = types.BoolValue(true)
+	}
+	newState := productEnvironmentFromResult(result, state.BaseSubAccountID, deletionProtection)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
@@ -206,7 +220,7 @@ func (r *productEnvironmentResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	newState := productEnvironmentFromResult(result, plan.BaseSubAccountID)
+	newState := productEnvironmentFromResult(result, plan.BaseSubAccountID, plan.DeletionProtection)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
@@ -217,6 +231,18 @@ func (r *productEnvironmentResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
+	if state.DeletionProtection.ValueBool() {
+		resp.Diagnostics.AddError(
+			"Deletion protection enabled",
+			fmt.Sprintf(
+				"Resource cloudinaryprovisioning_product_environment %q has deletion_protection = true. "+
+					"Set deletion_protection = false and run terraform apply before destroying.",
+				state.Name.ValueString(),
+			),
+		)
+		return
+	}
+
 	_, err := r.client.ProductEnvironments.Delete(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error deleting product environment", err.Error())
@@ -224,20 +250,45 @@ func (r *productEnvironmentResource) Delete(ctx context.Context, req resource.De
 	}
 }
 
+// ModifyPlan blocks destruction at plan time when deletion_protection is enabled,
+// preventing dependent resources from being partially destroyed before the error surfaces.
+func (r *productEnvironmentResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if !req.Plan.Raw.IsNull() {
+		return
+	}
+	var state productEnvironmentModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if state.DeletionProtection.ValueBool() {
+		resp.Diagnostics.AddError(
+			"Deletion protection enabled",
+			fmt.Sprintf(
+				"Resource cloudinaryprovisioning_product_environment %q has deletion_protection = true. "+
+					"Set deletion_protection = false and run terraform apply before destroying.",
+				state.Name.ValueString(),
+			),
+		)
+	}
+}
+
 func (r *productEnvironmentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.Set(ctx, &productEnvironmentModel{
-		ID: types.StringValue(req.ID),
+		ID:                 types.StringValue(req.ID),
+		DeletionProtection: types.BoolValue(true),
 	})...)
 }
 
 // productEnvironmentFromResult maps a Cloudinary API result to the Terraform state model.
-func productEnvironmentFromResult(result *components.ProductEnvironment, baseSubAccountID types.String) productEnvironmentModel {
+func productEnvironmentFromResult(result *components.ProductEnvironment, baseSubAccountID types.String, deletionProtection types.Bool) productEnvironmentModel {
 	state := productEnvironmentModel{
-		ID:               types.StringValue(util.DerefString(result.ID)),
-		Name:             types.StringValue(util.DerefString(result.Name)),
-		CloudName:        types.StringValue(util.DerefString(result.CloudName)),
-		Enabled:          types.BoolValue(util.DerefBool(result.Enabled)),
-		BaseSubAccountID: baseSubAccountID,
+		ID:                 types.StringValue(util.DerefString(result.ID)),
+		Name:               types.StringValue(util.DerefString(result.Name)),
+		CloudName:          types.StringValue(util.DerefString(result.CloudName)),
+		Enabled:            types.BoolValue(util.DerefBool(result.Enabled)),
+		BaseSubAccountID:   baseSubAccountID,
+		DeletionProtection: deletionProtection,
 	}
 	if result.CreatedAt != nil {
 		state.CreatedAt = types.StringValue(result.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"))

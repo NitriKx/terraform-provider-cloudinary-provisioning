@@ -72,8 +72,14 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 				Description: "Whether the role is managed by Cloudinary (\"system\") or by the user (\"custom\").",
 			},
 			"scope_type": schema.StringAttribute{
+				Optional:    true,
 				Computed:    true,
-				Description: "Where the role is applied: \"account\" or \"prodenv\".",
+				Description: "Where the role is applied: \"account\" or \"prodenv\". " +
+					"When provided, only roles matching this scope type are considered, " +
+					"which is useful when multiple roles share the same name across scopes (e.g. \"Admin\").",
+				Validators: []validator.String{
+					stringvalidator.OneOf("account", "prodenv"),
+				},
 			},
 		},
 	}
@@ -115,16 +121,21 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 
 	name := data.Name.ValueString()
+	scopeTypeFilter := data.ScopeType.ValueString()
 	for _, r := range result.Data {
-		if r.Name == name {
-			description, _ := r.Description.GetOrZero()
-			data.ID = types.StringValue(r.ID)
-			data.Description = types.StringValue(description)
-			data.ManagementType = types.StringValue(string(r.ManagementType))
-			data.ScopeType = types.StringValue(string(r.ScopeType))
-			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-			return
+		if r.Name != name {
+			continue
 		}
+		if scopeTypeFilter != "" && string(r.ScopeType) != scopeTypeFilter {
+			continue
+		}
+		description, _ := r.Description.GetOrZero()
+		data.ID = types.StringValue(r.ID)
+		data.Description = types.StringValue(description)
+		data.ManagementType = types.StringValue(string(r.ManagementType))
+		data.ScopeType = types.StringValue(string(r.ScopeType))
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+		return
 	}
 
 	resp.Diagnostics.AddError(
