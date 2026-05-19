@@ -72,8 +72,8 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 				Description: "Whether the role is managed by Cloudinary (\"system\") or by the user (\"custom\").",
 			},
 			"scope_type": schema.StringAttribute{
-				Optional:    true,
-				Computed:    true,
+				Optional: true,
+				Computed: true,
 				Description: "Where the role is applied: \"account\" or \"prodenv\". " +
 					"When provided, only roles matching this scope type are considered, " +
 					"which is useful when multiple roles share the same name across scopes (e.g. \"Admin\").",
