@@ -10,9 +10,13 @@ import (
 	"github.com/cloudinary/account-provisioning-go/cldprovisioning"
 	"github.com/cloudinary/account-provisioning-go/cldprovisioning/models/components"
 
+	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/providerdata"
 	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/resources/access_key"
+	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/resources/current_principal"
 	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/resources/custom_policy"
+	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/resources/principal_role_assignment"
 	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/resources/product_environment"
+	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/resources/role"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -108,6 +112,8 @@ func (p *CloudinaryProvisioningProvider) Configure(ctx context.Context, req prov
 				ProvisioningAPISecret: &parsedSecret,
 			}),
 		)
+		accountID = parsedAccountID
+		apiKey = parsedKey
 
 	case accountID != "" && apiKey != "" && apiSecret != "":
 		client = cldprovisioning.New(
@@ -128,8 +134,13 @@ func (p *CloudinaryProvisioningProvider) Configure(ctx context.Context, req prov
 		return
 	}
 
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	pd := &providerdata.ProviderData{
+		Client:    client,
+		APIKey:    apiKey,
+		AccountID: accountID,
+	}
+	resp.DataSourceData = pd
+	resp.ResourceData = pd
 }
 
 func (p *CloudinaryProvisioningProvider) Resources(_ context.Context) []func() resource.Resource {
@@ -137,12 +148,15 @@ func (p *CloudinaryProvisioningProvider) Resources(_ context.Context) []func() r
 		product_environment.NewResource,
 		access_key.NewResource,
 		custom_policy.NewResource,
+		principal_role_assignment.NewResource,
 	}
 }
 
 func (p *CloudinaryProvisioningProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		product_environment.NewDataSource,
+		role.NewDataSource,
+		current_principal.NewDataSource,
 	}
 }
 

@@ -1,6 +1,6 @@
 # Terraform Provider: Cloudinary Provisioning
 
-Manages account-level Cloudinary resources: product environments, access keys, and custom policies.
+Manages account-level Cloudinary resources: product environments, access keys, custom policies, and role assignments.
 
 For product-environment-level resources (folders, assets), see the companion
 [cloudinary provider](https://github.com/NitriKx/terraform-provider-cloudinary).
@@ -167,6 +167,45 @@ resource "cloudinaryprovisioning_custom_policy" "example" {
 terraform import cloudinaryprovisioning_custom_policy.example <id>
 ```
 
+### `cloudinaryprovisioning_principal_role_assignment`
+
+Assigns a role to a principal (user, group, API key, or provisioning key) within a given scope.
+All attributes are immutable: any change forces resource replacement.
+
+A common use case is granting a provisioning key Admin access to a newly created product environment,
+which is required before access keys can be created within that environment.
+
+```hcl
+data "cloudinaryprovisioning_role" "admin" {
+  name            = "Admin"
+  permission_type = "global"
+}
+
+resource "cloudinaryprovisioning_principal_role_assignment" "provisioning_key_admin" {
+  principal_type = "provisioningKey"
+  principal_id   = var.provisioning_api_key_id
+  role_id        = data.cloudinaryprovisioning_role.admin.id
+  scope_type     = "prodenv"
+  scope_id       = cloudinaryprovisioning_product_environment.example.id
+}
+```
+
+**Arguments:**
+- `principal_type` (Required) - Type of principal: `"user"`, `"group"`, `"apiKey"`, or `"provisioningKey"`. Forces replacement.
+- `principal_id` (Required) - The unique identifier of the principal. Forces replacement.
+- `role_id` (Required) - The role to assign (use the `cloudinaryprovisioning_role` data source to look up by name). Forces replacement.
+- `scope_type` (Required) - `"account"` or `"prodenv"`. Forces replacement.
+- `scope_id` (Optional) - Product environment ID. Required when `scope_type` is `"prodenv"`. Forces replacement.
+
+**Attributes:**
+- `id` - Composite identifier: `{principal_type}/{principal_id}/{role_id}/{scope_type}/{scope_id}`.
+
+**Import:**
+```bash
+terraform import cloudinaryprovisioning_principal_role_assignment.example \
+  provisioningKey/<principal_id>/<role_id>/prodenv/<scope_id>
+```
+
 ## Data Sources
 
 ### `cloudinaryprovisioning_product_environment`
@@ -184,6 +223,51 @@ data "cloudinaryprovisioning_product_environment" "current" {
 - `cloud_name` (Optional, Computed) - Look up by cloud name.
 
 **Attributes:** `name`, `enabled`, `created_at`, `updated_at`.
+
+### `cloudinaryprovisioning_current_principal`
+
+Returns the identity of the currently authenticated principal (the credentials used to configure
+the provider). Use `principal_id` and `principal_type` directly in role assignments.
+No API call is made — the values come from the provider configuration.
+
+```hcl
+data "cloudinaryprovisioning_current_principal" "me" {}
+
+resource "cloudinaryprovisioning_principal_role_assignment" "admin" {
+  principal_type = data.cloudinaryprovisioning_current_principal.me.principal_type
+  principal_id   = data.cloudinaryprovisioning_current_principal.me.principal_id
+  role_id        = data.cloudinaryprovisioning_role.admin.id
+  scope_type     = "prodenv"
+  scope_id       = cloudinaryprovisioning_product_environment.dev.id
+}
+```
+
+**Attributes:**
+- `principal_id` - The unique identifier of the current principal.
+- `principal_type` - The type of the current principal (currently always `"provisioningKey"`).
+- `account_id` - The Cloudinary account ID the provider is configured for.
+
+### `cloudinaryprovisioning_role`
+
+Looks up a Cloudinary role by name and permission type. Use this to retrieve the role ID
+needed for `cloudinaryprovisioning_principal_role_assignment`.
+
+```hcl
+data "cloudinaryprovisioning_role" "admin" {
+  name            = "Admin"
+  permission_type = "global"
+}
+
+output "admin_role_id" {
+  value = data.cloudinaryprovisioning_role.admin.id
+}
+```
+
+**Arguments:**
+- `name` (Required) - The role name to look up (e.g. `"Admin"`).
+- `permission_type` (Required) - `"global"` (role applies across all contexts within its scope, e.g. all folders in a product environment) or `"content"` (role applies to a specific content instance such as a particular folder or collection). Most built-in roles like `"Admin"` are `"global"`.
+
+**Attributes:** `id`, `description`, `management_type`, `scope_type`.
 
 ## Using both providers together
 

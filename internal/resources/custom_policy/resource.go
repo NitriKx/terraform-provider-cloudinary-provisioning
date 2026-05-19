@@ -13,6 +13,8 @@ import (
 	"github.com/cloudinary/account-provisioning-go/cldprovisioning/models/sdkerrors"
 	"github.com/cloudinary/account-provisioning-go/cldprovisioning/optionalnullable"
 
+	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/providerdata"
+
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -165,15 +167,15 @@ func (r *customPolicyResource) Configure(_ context.Context, req resource.Configu
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*cldprovisioning.CldProvisioning)
+	pd, ok := req.ProviderData.(*providerdata.ProviderData)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected provider data type",
-			fmt.Sprintf("Expected *cldprovisioning.CldProvisioning, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected *providerdata.ProviderData, got: %T", req.ProviderData),
 		)
 		return
 	}
-	r.client = client
+	r.client = pd.Client
 }
 
 func (r *customPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

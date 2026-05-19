@@ -10,6 +10,7 @@ import (
 	"github.com/cloudinary/account-provisioning-go/cldprovisioning/models/operations"
 	"github.com/cloudinary/account-provisioning-go/cldprovisioning/models/sdkerrors"
 
+	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/providerdata"
 	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -102,15 +103,15 @@ func (r *productEnvironmentResource) Configure(_ context.Context, req resource.C
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*cldprovisioning.CldProvisioning)
+	pd, ok := req.ProviderData.(*providerdata.ProviderData)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected provider data type",
-			fmt.Sprintf("Expected *cldprovisioning.CldProvisioning, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected *providerdata.ProviderData, got: %T", req.ProviderData),
 		)
 		return
 	}
-	r.client = client
+	r.client = pd.Client
 }
 
 func (r *productEnvironmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -149,8 +150,15 @@ func (r *productEnvironmentResource) Read(ctx context.Context, req resource.Read
 
 	result, err := r.client.ProductEnvironments.Get(ctx, state.ID.ValueString())
 	if err != nil {
+		var permErr *sdkerrors.PermissionsErrorResponse
+		if errors.As(err, &permErr) {
+			// 403: caller lacks read permission on this product environment.
+			// Keep existing state so that Terraform can still plan and execute Delete().
+			return
+		}
 		var errResp *sdkerrors.ErrorResponse
 		if errors.As(err, &errResp) {
+			// 404 or other API-level error: resource was deleted outside Terraform.
 			resp.State.RemoveResource(ctx)
 			return
 		}

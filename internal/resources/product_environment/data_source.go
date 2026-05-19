@@ -7,6 +7,7 @@ import (
 	"github.com/cloudinary/account-provisioning-go/cldprovisioning"
 	"github.com/cloudinary/account-provisioning-go/cldprovisioning/models/operations"
 
+	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/providerdata"
 	"github.com/NitriKx/terraform-provider-cloudinary-provisioning/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -76,15 +77,15 @@ func (d *productEnvironmentDataSource) Configure(_ context.Context, req datasour
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*cldprovisioning.CldProvisioning)
+	pd, ok := req.ProviderData.(*providerdata.ProviderData)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected provider data type",
-			fmt.Sprintf("Expected *cldprovisioning.CldProvisioning, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected *providerdata.ProviderData, got: %T", req.ProviderData),
 		)
 		return
 	}
-	d.client = client
+	d.client = pd.Client
 }
 
 func (d *productEnvironmentDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
