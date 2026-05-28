@@ -26,5 +26,3 @@ override.tf.json
 *.swo
 .DS_Store
 
-# Docs (generated)
-docs/
