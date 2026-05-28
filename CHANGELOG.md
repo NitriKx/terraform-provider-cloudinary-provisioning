@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.0](https://github.com/NitriKx/terraform-provider-cloudinary-provisioning/compare/v1.0.0...v1.1.0) (2026-05-28)
+## [0.1.0](https://github.com/NitriKx/terraform-provider-cloudinary-provisioning/compare/v1.0.0...v0.1.0) (2026-05-28)
 
 
 ### Features
