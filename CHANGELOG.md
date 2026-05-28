@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 (2026-05-28)
+## 0.1.1 (2026-05-28)
 
 
 ### Features
@@ -21,7 +21,7 @@
 * **provider:** add role assignments, role and current principal data sources ([19bb76d](https://github.com/NitriKx/terraform-provider-cloudinary-provisioning/commit/19bb76d22a8c515ccc6a83c1552686731d57b55f))
 * **provider:** initial implementation of cloudinary-provisioning provider ([a4a8316](https://github.com/NitriKx/terraform-provider-cloudinary-provisioning/commit/a4a83166af10742123c00f902a3be35af0fa11b1))
 
-## 1.0.0 (2026-05-20)
+## 0.1.1 (2026-05-20)
 
 
 ### Features
