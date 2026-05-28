@@ -1,0 +1,27 @@
+# Binaries
+terraform-provider-cloudinary-provisioning
+*.exe
+.task
+
+# Go
+vendor/
+*.test
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
