@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0 (2026-05-28)
+
+
+### Features
+
+* initial Cloudinary Provisioning Terraform provider ([c7e1ce0](https://github.com/NitriKx/terraform-provider-cloudinary-provisioning/commit/c7e1ce0fa66f59b386418455c2e4602b8e3840fa))
+
 ## [0.1.0](https://github.com/NitriKx/terraform-provider-cloudinary-provisioning/compare/v1.0.0...v0.1.0) (2026-05-28)
 
 
