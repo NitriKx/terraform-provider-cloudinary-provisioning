@@ -25,5 +25,3 @@ override.tf.json
 *.swp
 *.swo
 .DS_Store
-
-
