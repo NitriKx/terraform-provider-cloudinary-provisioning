@@ -10,7 +10,7 @@ import (
 )
 
 // version is set at build time via goreleaser ldflags.
-var version string = "0.1.0"
+var version string = "0.1.1"
 
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-dir . --provider-name cloudinaryprovisioning
 
