@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/NitriKx/terraform-provider-cloudinary-provisioning/compare/v0.1.1...v0.1.2) (2026-07-28)
+
+
+### Bug Fixes
+
+* populate access_key id and pass credentials the SDK can read ([#14](https://github.com/NitriKx/terraform-provider-cloudinary-provisioning/issues/14)) ([2748e36](https://github.com/NitriKx/terraform-provider-cloudinary-provisioning/commit/2748e364ac793e3134de5f57c685f36cf8f48ffe))
+
 ## 0.1.1 (2026-05-28)
 
 
