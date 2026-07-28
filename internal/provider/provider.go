@@ -105,6 +105,10 @@ func (p *CloudinaryProvisioningProvider) Configure(ctx context.Context, req prov
 			resp.Diagnostics.AddError("Invalid account_url", fmt.Sprintf("Failed to parse account_url: %s", parseErr))
 			return
 		}
+		if envErr := exportSDKCredentialEnv(parsedAccountID, parsedKey, parsedSecret); envErr != nil {
+			resp.Diagnostics.AddError("Cannot configure Cloudinary Provisioning credentials", envErr.Error())
+			return
+		}
 		client = cldprovisioning.New(
 			cldprovisioning.WithAccountID(parsedAccountID),
 			cldprovisioning.WithSecurity(components.Security{
@@ -116,6 +120,10 @@ func (p *CloudinaryProvisioningProvider) Configure(ctx context.Context, req prov
 		apiKey = parsedKey
 
 	case accountID != "" && apiKey != "" && apiSecret != "":
+		if envErr := exportSDKCredentialEnv(accountID, apiKey, apiSecret); envErr != nil {
+			resp.Diagnostics.AddError("Cannot configure Cloudinary Provisioning credentials", envErr.Error())
+			return
+		}
 		client = cldprovisioning.New(
 			cldprovisioning.WithAccountID(accountID),
 			cldprovisioning.WithSecurity(components.Security{
@@ -158,6 +166,43 @@ func (p *CloudinaryProvisioningProvider) DataSources(_ context.Context) []func()
 		role.NewDataSource,
 		current_principal.NewDataSource,
 	}
+}
+
+// exportSDKCredentialEnv publishes the credentials under the environment variable
+// names that cldprovisioning reads, and must be called before cldprovisioning.New:
+// the SDK installs its auth hook inside New and resolves these variables there.
+//
+// This exists to work around a defect in cldprovisioning v0.1.0, which cannot accept
+// credentials programmatically at all. WithSecurity hands the components.Security
+// value to utils.AsSecuritySource, which stores it in an interface{}; the auth hook
+// then recovers it with a type assertion against getters declared on *Security. A
+// value never satisfies a pointer-receiver interface, so the assertion fails
+// silently, the hook falls back to the environment, and requests die with
+// "provisioning API key and secret are required". WithSecuritySource shares the
+// defect, and v0.1.0 is the only published version, so the environment is the sole
+// working channel.
+//
+// Note the PROVISIONING_ infix. These names are NOT this provider's own
+// CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET fallbacks; exporting those has no
+// effect on the SDK.
+//
+// The environment is process-global while provider instances are not. That is sound
+// only because a Cloudinary provisioning key is issued once per account and shared
+// across every product environment, so all instances resolve the same credentials.
+// Introducing a second Cloudinary account would break this assumption.
+//
+// Remove this once cldprovisioning accepts credentials programmatically.
+func exportSDKCredentialEnv(accountID, apiKey, apiSecret string) error {
+	for name, value := range map[string]string{
+		"CLOUDINARY_ACCOUNT_ID":              accountID,
+		"CLOUDINARY_PROVISIONING_API_KEY":    apiKey,
+		"CLOUDINARY_PROVISIONING_API_SECRET": apiSecret,
+	} {
+		if err := os.Setenv(name, value); err != nil {
+			return fmt.Errorf("cannot export %s: %w", name, err)
+		}
+	}
+	return nil
 }
 
 // resolveValue returns the string value of a types.String attribute if set,
