@@ -34,6 +34,7 @@ type accessKeyResource struct {
 }
 
 type accessKeyModel struct {
+	ID                   types.String `tfsdk:"id"`
 	ProductEnvironmentID types.String `tfsdk:"product_environment_id"`
 	Name                 types.String `tfsdk:"name"`
 	Enabled              types.Bool   `tfsdk:"enabled"`
@@ -41,6 +42,23 @@ type accessKeyModel struct {
 	APISecret            types.String `tfsdk:"api_secret"`
 	CreatedAt            types.String `tfsdk:"created_at"`
 	UpdatedAt            types.String `tfsdk:"updated_at"`
+}
+
+// accessKeyID builds the Terraform state identifier for an access key. Cloudinary
+// scopes api_key values to a product environment, so the identifier is composite.
+func accessKeyID(productEnvironmentID, apiKey string) string {
+	return productEnvironmentID + "/" + apiKey
+}
+
+// parseAccessKeyID splits an identifier produced by accessKeyID back into its parts.
+func parseAccessKeyID(id string) (productEnvironmentID, apiKey string, err error) {
+	parts := strings.SplitN(id, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf(
+			"expected format {product_environment_id}/{api_key}, got: %q", id,
+		)
+	}
+	return parts[0], parts[1], nil
 }
 
 func (r *accessKeyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -52,6 +70,14 @@ func (r *accessKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 		Description: "Manages an API access key for a Cloudinary product environment. " +
 			"Access keys provide the credentials needed to interact with a product environment's API.",
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed: true,
+				Description: "Composite identifier: {product_environment_id}/{api_key}. " +
+					"Also the format accepted by terraform import.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"product_environment_id": schema.StringAttribute{
 				Required: true,
 				Description: "The ID of the product environment this access key belongs to. " +
@@ -164,17 +190,7 @@ func (r *accessKeyResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	// api_secret is not returned on reads; preserve the value from state.
-	state.Name = types.StringValue(util.DerefString(found.Name))
-	state.Enabled = types.BoolValue(util.DerefBool(found.Enabled))
-	state.APIKey = types.StringValue(util.DerefString(found.APIKey))
-	if found.CreatedAt != nil {
-		state.CreatedAt = types.StringValue(found.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"))
-	}
-	if found.UpdatedAt != nil {
-		state.UpdatedAt = types.StringValue(found.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"))
-	}
-	// api_secret stays as-is from state.
+	applyFoundAccessKey(&state, found)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -210,13 +226,7 @@ func (r *accessKeyResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Preserve api_secret from state since it's not returned on updates.
-	state.Name = types.StringValue(util.DerefString(result.Name))
-	state.Enabled = types.BoolValue(util.DerefBool(result.Enabled))
-	state.APIKey = types.StringValue(util.DerefString(result.APIKey))
-	if result.UpdatedAt != nil {
-		state.UpdatedAt = types.StringValue(result.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"))
-	}
+	applyFoundAccessKey(&state, result)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -239,22 +249,16 @@ func (r *accessKeyResource) Delete(ctx context.Context, req resource.DeleteReque
 }
 
 func (r *accessKeyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import ID format: "{product_environment_id}/{api_key}"
-	parts := strings.SplitN(req.ID, "/", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		resp.Diagnostics.AddError(
-			"Invalid import ID",
-			fmt.Sprintf(
-				"Expected format: {product_environment_id}/{api_key}. Got: %q",
-				req.ID,
-			),
-		)
+	productEnvironmentID, apiKey, err := parseAccessKeyID(req.ID)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid import ID", err.Error())
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &accessKeyModel{
-		ProductEnvironmentID: types.StringValue(parts[0]),
-		APIKey:               types.StringValue(parts[1]),
+		ID:                   types.StringValue(accessKeyID(productEnvironmentID, apiKey)),
+		ProductEnvironmentID: types.StringValue(productEnvironmentID),
+		APIKey:               types.StringValue(apiKey),
 	})...)
 }
 
@@ -297,13 +301,34 @@ func findAccessKey(ctx context.Context, client *cldprovisioning.CldProvisioning,
 	}
 }
 
+// applyFoundAccessKey refreshes the mutable fields of state from an API result.
+// api_secret is deliberately left untouched: the list endpoint never returns it, so
+// the value from state is the only copy. The identifier is recomputed rather than
+// preserved, which backfills resources whose state predates the id attribute.
+func applyFoundAccessKey(state *accessKeyModel, found *components.AccessKey) {
+	state.Name = types.StringValue(util.DerefString(found.Name))
+	state.Enabled = types.BoolValue(util.DerefBool(found.Enabled))
+	state.APIKey = types.StringValue(util.DerefString(found.APIKey))
+	state.ID = types.StringValue(
+		accessKeyID(state.ProductEnvironmentID.ValueString(), state.APIKey.ValueString()),
+	)
+	if found.CreatedAt != nil {
+		state.CreatedAt = types.StringValue(found.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"))
+	}
+	if found.UpdatedAt != nil {
+		state.UpdatedAt = types.StringValue(found.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"))
+	}
+}
+
 // accessKeyFromResult maps a Cloudinary API result to the Terraform state model.
 func accessKeyFromResult(result *components.AccessKey, productEnvironmentID types.String) accessKeyModel {
+	apiKey := util.DerefString(result.APIKey)
 	state := accessKeyModel{
+		ID:                   types.StringValue(accessKeyID(productEnvironmentID.ValueString(), apiKey)),
 		ProductEnvironmentID: productEnvironmentID,
 		Name:                 types.StringValue(util.DerefString(result.Name)),
 		Enabled:              types.BoolValue(util.DerefBool(result.Enabled)),
-		APIKey:               types.StringValue(util.DerefString(result.APIKey)),
+		APIKey:               types.StringValue(apiKey),
 		APISecret:            types.StringValue(util.DerefString(result.APISecret)),
 	}
 	if result.CreatedAt != nil {

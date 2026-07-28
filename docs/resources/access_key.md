@@ -51,4 +51,5 @@ output "api_secret" {
 - `api_key` (String) The API key identifier.
 - `api_secret` (String, Sensitive) The API secret. Only available immediately after creation. Preserved in state.
 - `created_at` (String) The time at which the access key was created (RFC3339).
+- `id` (String) Composite identifier: {product_environment_id}/{api_key}. Also the format accepted by terraform import.
 - `updated_at` (String) The time at which the access key was last updated (RFC3339).
